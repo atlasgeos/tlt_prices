@@ -22,7 +22,8 @@ def clean_price(price_str):
 
 
 def scrape_market(driver, market_id):
-    url = f"https://talaadthai.com{market_id}"
+    url = f"https://talaadthai.com/products?market={market_id}"
+    #https://talaadthai.com/products?market=12
     driver.get(url)  
     time.sleep(5) # รอสรุปผลรอบสุดท้าย
 
