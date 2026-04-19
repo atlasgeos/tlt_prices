@@ -15,9 +15,17 @@ def format_date_to_iso(date_str):
 
 def clean_price(price_str):
     try:
-        return float(price_str.replace(',', '').strip())
-    except:
-        return 0.0
+        # 1. ทำความสะอาดและแปลงเป็นตัวเลขก่อน
+        price = float(str(price_str).replace(',', '').strip())
+        
+        # 2. เช็คเงื่อนไขการแสดงผล
+        if price % 1 == 0:
+            return str(int(price))    # เลขกลม -> "10"
+        else:
+            return f"{price:.2f}"     # มีเศษ -> "10.50"
+            
+    except (ValueError, AttributeError):
+        return "0"
 
 
 
@@ -32,11 +40,20 @@ def scrape_market(driver, market_id):
     
     market_data = []
     three_months_ago = datetime.now() - timedelta(days=90)
-
     for item in products:
         try:
+            # ดึงชื่อสินค้า
             name = item.find('div', class_='productName').get_text(strip=True)
-            location = item.find('div', class_='location').get_text(strip=True)
+            
+            # ดึง Location และจัดการค่าว่าง
+            location_raw = item.find('div', class_='location').get_text(strip=True)
+            if not location_raw:
+                location_raw = "อื่นๆ"
+
+            # แยก Location ด้วยเครื่องหมาย "," (ถ้ามี)
+            # เช่น "ข้าวสารและสินค้าอุปโภคบริโภค, ตลาดข้าวสาร" -> ["ข้าวสารและสินค้าอุปโภคบริโภค", "ตลาดข้าวสาร"]
+            locations = [loc.strip() for loc in location_raw.split(',')]
+
             min_p_raw = item.find('div', class_='minPrice').get_text(strip=True)
             max_p_raw = item.find('div', class_='maxPrice').get_text(strip=True)
             unit = item.find('div', class_='unit').get_text(strip=True)
@@ -47,12 +64,13 @@ def scrape_market(driver, market_id):
             min_p = clean_price(min_p_raw)
             max_p = clean_price(max_p_raw)
             
-            # --- กรอง: 1. วันที่ต้องใหม่ 2. ราคาต้องไม่เป็น 0 ---
-            if dt_object and dt_object >= three_months_ago:
-                if min_p > 0 and max_p > 0: # ป้องกันโดนผู้ใช้ด่าเรื่องราคาเป็น 0
+            # กรองวันที่และราคา
+            if dt_object and dt_object >= three_months_ago and min_p > 0:
+                # วนลูปสร้าง record ตามจำนวน location ที่แยกได้
+                for loc in locations:
                     market_data.append({
                         "product_name": name,
-                        "location": location,
+                        "location": loc, # ใส่ location ที่แยกแล้ว
                         "price_range": f"{min_p}-{max_p}",
                         "min_price": min_p,
                         "max_price": max_p,
