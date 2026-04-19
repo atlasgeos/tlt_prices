@@ -25,7 +25,7 @@ def clean_price(price_str):
 def scrape_market(driver, market_id):
     url = f"https://talaadthai.com/products?market={market_id}"
     driver.get(url)
-    time.sleep(15)  # รอโหลดข้อมูลแต่ละตลาด
+    time.sleep(5)  # รอโหลดข้อมูลแต่ละตลาด
     
     soup = BeautifulSoup(driver.page_source, 'html.parser')
     products = soup.find_all('div', class_='out-div-one')
