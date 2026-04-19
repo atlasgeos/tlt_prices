@@ -1,0 +1,24 @@
+name: Keep Alive
+
+on:
+  schedule:
+    - cron: '0 0 1 * *' # รันทุกวันที่ 1 ของเดือน เวลา 07:00 น. (ไทย)
+  workflow_dispatch: # กดรันเองได้
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Dummy Commit
+        run: |
+          date > keep_alive.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@://github.com"
+          git add keep_alive.txt
+          git commit -m "Keep-alive: automatic commit to prevent workflow suspension"
+          git push
