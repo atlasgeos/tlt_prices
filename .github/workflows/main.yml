@@ -1,1 +1,29 @@
+name: TalaadThai Scraper
+
+on:
+  schedule:
+    - cron: '0 1 * * *' # รันทุกวันตอน 08:00 น. เวลาไทย (1:00 UTC)
+  workflow_dispatch: # กดรันเองมือถือได้
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install supabase requests beautifulsoup4 # หรือใช้ pip install -r requirements.txt
+
+      - name: Run Scraper and Upload
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python upsert_to_supabase.py
 
