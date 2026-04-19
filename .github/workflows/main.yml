@@ -26,7 +26,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install selenium beautifulsoup4 supabase webdriver-manager
+          pip install selenium beautifulsoup4 supabase webdriver-manager postgrest
 
       - name: Run Scraper and Upload to Supabase
         env:
