@@ -13,6 +13,15 @@ def format_date_to_iso(date_str):
     except:
         return None
 
+def clean_price(price_str):
+    try:
+        # ลบ , และช่องว่าง แล้วแปลงเป็น float
+        return float(price_str.replace(',', '').strip())
+    except:
+        return 0.0
+
+
+
 def scrape_market(driver, market_id):
     url = f"https://talaadthai.com/products?market={market_id}"
     driver.get(url)
@@ -31,6 +40,8 @@ def scrape_market(driver, market_id):
             unit = item.find('div', class_='unit').get_text(strip=True)
             trend = item.find('div', class_='tag-children').get_text(strip=True)
             raw_date = item.find('div', class_='updateDate').get_text(strip=True)
+
+
             
             iso_date = format_date_to_iso(raw_date)
             if iso_date:
@@ -38,8 +49,10 @@ def scrape_market(driver, market_id):
                     "product_name": name,
                     "location": location,
                     "price_range": f"{min_p}-{max_p}",
-                    "min_price": float(min_p) if min_p else max_p, # เพิ่มฟิลด์แยก
-                    "max_price": float(max_p) if max_p else min_p, # เพิ่มฟิลด์แยก
+                    #"min_price": float(min_p) if min_p else max_p, # เพิ่มฟิลด์แยก
+                    #"max_price": float(max_p) if max_p else min_p, # เพิ่มฟิลด์แยก
+                    "min_price": clean_price(min_p),
+                    "max_price": clean_price(max_p),
                     "unit": unit,
                     "trend": trend,
                     "update_date": iso_date
@@ -82,8 +95,8 @@ def upload_to_supabase(data):
         batch = data[i:i+100]
         try:
             supabase.table("talaadthai_prices").upsert(
-                batch, on_conflict="product_name, update_date"
-            ).execute()
+                batch, on_conflict="product_name, location, unit, update_date"  # เพิ่ม location และ unit
+            ).execute()    
         except Exception as e:
             print(f"⚠️ Batch Error: {e}")
 
