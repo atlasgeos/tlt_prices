@@ -32,4 +32,6 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python ./upsert_to_supabase.py
+        run: |
+          ls -R  # คำสั่งนี้จะช่วยแสดงรายการไฟล์ทั้งหมดใน Log เพื่อตรวจสอบ
+          python upsert_to_supabase.py
