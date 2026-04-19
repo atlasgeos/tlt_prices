@@ -90,7 +90,7 @@ def run_all_markets():
             
     driver.quit()
     return all_results
-
+    
 def upload_to_supabase(data):
     if not data: 
         print("💡 No data to upload.")
@@ -100,25 +100,27 @@ def upload_to_supabase(data):
     key = os.environ.get("SUPABASE_KEY")
     supabase: Client = create_client(url, key)
     
-    # กำจัดตัวซ้ำใน List เองก่อนส่ง
+    # กรองตัวซ้ำในลิสต์ (ป้องกัน Error 21000)
     unique_items = {}
     for item in data:
+        # ต้องใช้ key เดียวกับ Unique Constraint ใน DB
         key_id = (item['product_name'], item['location'], item['unit'], item['update_date'])
         unique_items[key_id] = item 
     
     clean_data = list(unique_items.values())
     print(f"🧹 Summary: Scraped {len(data)} -> Unique {len(clean_data)} items")
 
-    # แบ่ง Batch ละ 50 รายการ (ลดขนาดลงเพื่อความชัวร์)
     for i in range(0, len(clean_data), 50):
         batch = clean_data[i:i+50]
         try:
-            # on_conflict ต้องตรงกับ Constraint ใน Database
+            # ใช้ on_conflict ตามที่เราเซ็ตไว้ใน SQL
             supabase.table("talaadthai_prices").upsert(
                 batch, on_conflict="product_name, location, unit, update_date"
             ).execute()
+            print(f"✅ Batch {i//50 + 1} uploaded successfully.")
         except Exception as e:
             print(f"⚠️ Batch Error: {e}")
+
 
 if __name__ == "__main__":
     final_data = run_all_markets()
