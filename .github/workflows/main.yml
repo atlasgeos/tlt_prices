@@ -1,29 +1,35 @@
-name: TalaadThai Scraper
+name: TalaadThai Scraper to Supabase
 
 on:
   schedule:
-    - cron: '0 1 * * *' # รันทุกวันตอน 08:00 น. เวลาไทย (1:00 UTC)
-  workflow_dispatch: # กดรันเองมือถือได้
+    - cron: '0 1 * * *' # รันทุกวันเวลา 08:00 น. (เวลาไทย)
+  workflow_dispatch: # ปุ่มสำหรับกดรันเองเพื่อทดสอบ
 
 jobs:
-  build:
+  scrape-and-upload:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
-      - name: Install dependencies
+      - name: Install Chrome and WebDriver
         run: |
-          pip install supabase requests beautifulsoup4 # หรือใช้ pip install -r requirements.txt
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          # ระบบจะใช้ Selenium Manager ในการจัดการ Driver ให้อัตโนมัติในเวอร์ชันใหม่ๆ
 
-      - name: Run Scraper and Upload
+      - name: Install Dependencies
+        run: |
+          pip install selenium beautifulsoup4 supabase webdriver-manager
+
+      - name: Run Scraper and Upload to Supabase
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python upsert_to_supabase.py
-
