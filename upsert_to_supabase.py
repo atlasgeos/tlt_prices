@@ -90,15 +90,27 @@ def upload_to_supabase(data):
     key = os.environ.get("SUPABASE_KEY")
     supabase: Client = create_client(url, key)
     
-    # แบ่งส่งทีละ 100 รายการเพื่อป้องกัน Request ใหญ่เกินไป
-    for i in range(0, len(data), 100):
-        batch = data[i:i+100]
+    # --- เพิ่มตรงนี้: กรองตัวซ้ำในลิสต์ออกก่อน ---
+    unique_items = {}
+    for item in data:
+        # สร้าง key จากฟิลด์ที่เราใช้เช็คความซ้ำ
+        key_id = (item['product_name'], item['location'], item['unit'], item['update_date'])
+        unique_items[key_id] = item  # ถ้าซ้ำ มันจะเก็บตัวล่าสุดไว้
+    
+    clean_data = list(unique_items.values())
+    print(f"🧹 Cleaned data: {len(data)} -> {len(clean_data)} items")
+    # ---------------------------------------
+
+    # เปลี่ยนมาใช้ clean_data แทน data เดิม
+    for i in range(0, len(clean_data), 100):
+        batch = clean_data[i:i+100]
         try:
             supabase.table("talaadthai_prices").upsert(
-                batch, on_conflict="product_name, location, unit, update_date"  # เพิ่ม location และ unit
-            ).execute()    
+                batch, on_conflict="product_name, location, unit, update_date"
+            ).execute()
         except Exception as e:
             print(f"⚠️ Batch Error: {e}")
+
 
 if __name__ == "__main__":
     final_data = run_all_markets()
