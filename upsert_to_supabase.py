@@ -15,17 +15,11 @@ def format_date_to_iso(date_str):
 
 def clean_price(price_str):
     try:
-        # 1. ทำความสะอาดและแปลงเป็นตัวเลขก่อน
-        price = float(str(price_str).replace(',', '').strip())
-        
-        # 2. เช็คเงื่อนไขการแสดงผล
-        if price % 1 == 0:
-            return str(int(price))    # เลขกลม -> "10"
-        else:
-            return f"{price:.2f}"     # มีเศษ -> "10.50"
-            
+        # คืนค่าเป็น float เสมอเพื่อเอาไปเช็คเงื่อนไข > 0 ได้
+        return float(str(price_str).replace(',', '').strip())
     except (ValueError, AttributeError):
-        return "0"
+        return 0.0
+
 
 
 
@@ -71,7 +65,7 @@ def scrape_market(driver, market_id):
                     market_data.append({
                         "product_name": name,
                         "location": loc, # ใส่ location ที่แยกแล้ว
-                        "price_range": f"{min_p}-{max_p}",
+                        "price_range": f"{min_p:g}-{max_p:g}", 
                         "min_price": min_p,
                         "max_price": max_p,
                         "unit": unit,
