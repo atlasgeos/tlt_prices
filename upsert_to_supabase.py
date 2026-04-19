@@ -19,49 +19,58 @@ def clean_price(price_str):
     except:
         return 0.0
 
+
+
 def scrape_market(driver, market_id):
-    url = f"https://talaadthai.com/products?market={market_id}"
+    url = f"https://talaadthai.com{market_id}"
     driver.get(url)
-    time.sleep(8) # ปรับเพิ่มเป็น 8 วินาที เผื่อหน้าเว็บโหลดช้า (สาเหตุที่ข้อมูลมาน้อย)
     
-    # เลื่อนหน้าจอลงเพื่อให้ Lazy Load ทำงาน (ช่วยให้ดึงข้อมูลได้ครบขึ้น)
-    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-    time.sleep(2)
+    # วนลูปเลื่อนหน้าจอ 3 ครั้งเพื่อให้ Lazy Load ทำงานได้เต็มที่
+    for _ in range(2):
+        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+        time.sleep(2) 
+    
+    time.sleep(5) # รอสรุปผลรอบสุดท้าย
 
     soup = BeautifulSoup(driver.page_source, 'html.parser')
     products = soup.find_all('div', class_='out-div-one')
     
     market_data = []
-    # คำนวณวันที่ย้อนหลัง 3 เดือน
     three_months_ago = datetime.now() - timedelta(days=90)
 
     for item in products:
         try:
             name = item.find('div', class_='productName').get_text(strip=True)
             location = item.find('div', class_='location').get_text(strip=True)
-            min_p = item.find('div', class_='minPrice').get_text(strip=True)
-            max_p = item.find('div', class_='maxPrice').get_text(strip=True)
+            min_p_raw = item.find('div', class_='minPrice').get_text(strip=True)
+            max_p_raw = item.find('div', class_='maxPrice').get_text(strip=True)
             unit = item.find('div', class_='unit').get_text(strip=True)
             trend = item.find('div', class_='tag-children').get_text(strip=True)
             raw_date = item.find('div', class_='updateDate').get_text(strip=True)
 
             dt_object = format_date_to_iso(raw_date)
+            min_p = clean_price(min_p_raw)
+            max_p = clean_price(max_p_raw)
             
-            # --- กรองวันที่: เอาเฉพาะไม่เกิน 3 เดือน ---
+            # --- กรอง: 1. วันที่ต้องใหม่ 2. ราคาต้องไม่เป็น 0 ---
             if dt_object and dt_object >= three_months_ago:
-                market_data.append({
-                    "product_name": name,
-                    "location": location,
-                    "price_range": f"{min_p}-{max_p}",
-                    "min_price": clean_price(min_p),
-                    "max_price": clean_price(max_p),
-                    "unit": unit,
-                    "trend": trend,
-                    "update_date": dt_object.strftime('%Y-%m-%d') # แปลงกลับเป็น ISO String
-                })
+                if min_p > 0 and max_p > 0: # ป้องกันโดนผู้ใช้ด่าเรื่องราคาเป็น 0
+                    market_data.append({
+                        "product_name": name,
+                        "location": location,
+                        "price_range": f"{min_p}-{max_p}",
+                        "min_price": min_p,
+                        "max_price": max_p,
+                        "unit": unit,
+                        "trend": trend,
+                        "update_date": dt_object.strftime('%Y-%m-%d')
+                    })
         except Exception:
             continue
     return market_data
+
+
+
 
 def run_all_markets():
     chrome_options = Options()
