@@ -33,5 +33,5 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          ls -R  # คำสั่งนี้จะช่วยแสดงรายการไฟล์ทั้งหมดใน Log เพื่อตรวจสอบ
-          python upsert_to_supabase.py
+          ls -la          # ช่วยโชว์รายชื่อไฟล์ใน Log เผื่อเช็คชื่อผิด
+          python ./upsert_to_supabase.py
