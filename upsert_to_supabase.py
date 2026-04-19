@@ -23,13 +23,7 @@ def clean_price(price_str):
 
 def scrape_market(driver, market_id):
     url = f"https://talaadthai.com{market_id}"
-    driver.get(url)
-    
-    # วนลูปเลื่อนหน้าจอ 3 ครั้งเพื่อให้ Lazy Load ทำงานได้เต็มที่
-    for _ in range(2):
-        driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        time.sleep(2) 
-    
+    driver.get(url)  
     time.sleep(5) # รอสรุปผลรอบสุดท้าย
 
     soup = BeautifulSoup(driver.page_source, 'html.parser')
