@@ -1,6 +1,6 @@
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta # เพิ่ม timedelta สำหรับคำนวณย้อนหลัง
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
@@ -9,28 +9,32 @@ from supabase import create_client, Client
 def format_date_to_iso(date_str):
     try:
         clean_date = date_str.replace('(', '').replace(')', '').strip()
-        return datetime.strptime(clean_date, '%d/%m/%Y').strftime('%Y-%m-%d')
+        return datetime.strptime(clean_date, '%d/%m/%Y') # คืนค่าเป็น object เพื่อนำไปเทียบวันที่ง่ายขึ้น
     except:
         return None
 
 def clean_price(price_str):
     try:
-        # ลบ , และช่องว่าง แล้วแปลงเป็น float
         return float(price_str.replace(',', '').strip())
     except:
         return 0.0
 
-
-
 def scrape_market(driver, market_id):
     url = f"https://talaadthai.com/products?market={market_id}"
     driver.get(url)
-    time.sleep(5)  # รอโหลดข้อมูลแต่ละตลาด
+    time.sleep(8) # ปรับเพิ่มเป็น 8 วินาที เผื่อหน้าเว็บโหลดช้า (สาเหตุที่ข้อมูลมาน้อย)
     
+    # เลื่อนหน้าจอลงเพื่อให้ Lazy Load ทำงาน (ช่วยให้ดึงข้อมูลได้ครบขึ้น)
+    driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+    time.sleep(2)
+
     soup = BeautifulSoup(driver.page_source, 'html.parser')
     products = soup.find_all('div', class_='out-div-one')
     
     market_data = []
+    # คำนวณวันที่ย้อนหลัง 3 เดือน
+    three_months_ago = datetime.now() - timedelta(days=90)
+
     for item in products:
         try:
             name = item.find('div', class_='productName').get_text(strip=True)
@@ -41,21 +45,19 @@ def scrape_market(driver, market_id):
             trend = item.find('div', class_='tag-children').get_text(strip=True)
             raw_date = item.find('div', class_='updateDate').get_text(strip=True)
 
-
+            dt_object = format_date_to_iso(raw_date)
             
-            iso_date = format_date_to_iso(raw_date)
-            if iso_date:
+            # --- กรองวันที่: เอาเฉพาะไม่เกิน 3 เดือน ---
+            if dt_object and dt_object >= three_months_ago:
                 market_data.append({
                     "product_name": name,
                     "location": location,
                     "price_range": f"{min_p}-{max_p}",
-                    #"min_price": float(min_p) if min_p else max_p, # เพิ่มฟิลด์แยก
-                    #"max_price": float(max_p) if max_p else min_p, # เพิ่มฟิลด์แยก
                     "min_price": clean_price(min_p),
                     "max_price": clean_price(max_p),
                     "unit": unit,
                     "trend": trend,
-                    "update_date": iso_date
+                    "update_date": dt_object.strftime('%Y-%m-%d') # แปลงกลับเป็น ISO String
                 })
         except Exception:
             continue
@@ -66,6 +68,7 @@ def run_all_markets():
     chrome_options.add_argument("--headless")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--window-size=1920,1080") # กำหนดขนาดหน้าจอให้ใหญ่เพื่อให้เห็นสินค้าครบ
     
     driver = webdriver.Chrome(options=chrome_options)
     all_results = []
@@ -77,9 +80,9 @@ def run_all_markets():
         data = scrape_market(driver, m_id)
         if data:
             all_results.extend(data)
-            print(f"✅ Found {len(data)} items.")
+            print(f"✅ Found {len(data)} items (filtered by date).")
         else:
-            print(f"❌ No items in Market {m_id}, skipping.")
+            print(f"❌ No recent items in Market {m_id}, skipping.")
             
     driver.quit()
     return all_results
@@ -90,30 +93,27 @@ def upload_to_supabase(data):
     key = os.environ.get("SUPABASE_KEY")
     supabase: Client = create_client(url, key)
     
-    # --- เพิ่มตรงนี้: กรองตัวซ้ำในลิสต์ออกก่อน ---
+    # กรองตัวซ้ำโดยใช้ชื่อสินค้า + สถานที่ + หน่วย + วันที่
     unique_items = {}
     for item in data:
-        # สร้าง key จากฟิลด์ที่เราใช้เช็คความซ้ำ
         key_id = (item['product_name'], item['location'], item['unit'], item['update_date'])
-        unique_items[key_id] = item  # ถ้าซ้ำ มันจะเก็บตัวล่าสุดไว้
+        unique_items[key_id] = item 
     
     clean_data = list(unique_items.values())
-    print(f"🧹 Cleaned data: {len(data)} -> {len(clean_data)} items")
-    # ---------------------------------------
+    print(f"🧹 Data Summary: Scraped {len(data)} -> Unique {len(clean_data)} items")
 
-    # เปลี่ยนมาใช้ clean_data แทน data เดิม
     for i in range(0, len(clean_data), 100):
         batch = clean_data[i:i+100]
         try:
+            # ใช้ on_conflict ครอบคลุมฟิลด์ที่ทำให้ข้อมูลแตกต่างกัน
             supabase.table("talaadthai_prices").upsert(
                 batch, on_conflict="product_name, location, unit, update_date"
             ).execute()
         except Exception as e:
             print(f"⚠️ Batch Error: {e}")
 
-
 if __name__ == "__main__":
     final_data = run_all_markets()
-    print(f"📊 Total items scraped: {len(final_data)}")
+    print(f"📊 Total recent items: {len(final_data)}")
     upload_to_supabase(final_data)
     print("🏁 All done!")
